@@ -1,4 +1,3 @@
-
 struct DA_Node
 {
     public int Need_offset, Need_Len, Setter_offset, Setter_Len;
@@ -34,8 +33,6 @@ sealed class Dependency_Analyzer
     private DA_State[] State_helpers;
     private int Target_node_id;
 
-    private readonly string[] Syntax;
-    
     public const int Null = -1;
 
     // Funcs -----------------------------
@@ -66,7 +63,7 @@ sealed class Dependency_Analyzer
             return false;
         }
 
-        bool Nodes_available = true, Unlocked = false;
+        bool Nodes_available = true;
         var Nodes_visited = new List<int>(Nodes.Count); // for newly visited ones to be updated
 
         try
@@ -80,47 +77,33 @@ sealed class Dependency_Analyzer
                 foreach (var i in Nodes)
                 {
                     var Temp_val = i.Value;
+
+                    if (Temp_val.Need_offset < 0 || Temp_val.Need_Len < 1 ||
+                    Temp_val.Need_offset + Temp_val.Need_Len > State_helpers.Length) Temp_val.Need_offset = Null; // rectify wrong data prvodied
                     if (Temp_val.Visited) continue;
+                    if (Temp_val.Need_offset == Null)
+                    {
+                        Run_Node_Setter(ref Nodes_available, ref Temp_val);
+                        Nodes_visited.Add(i.Key);
+                        continue;
+                    }
 
                     // section it marks in array does current state val match needed vals
-                    Unlocked = false;
-
-                    if (Temp_val.Need_offset != Null)
-                        for (int j = Temp_val.Need_offset; j < Temp_val.Need_offset + Temp_val.Need_Len; j++)
-                        {
-                            // if any need not complete it will break thats why next one is in condition
-                            if (States[State_helpers[j].Id] != State_helpers[j].Val)
-                                break;
-
-                            // means all conditions met
-                            if (j == Temp_val.Need_offset + Temp_val.Need_Len - 1)
-                                Unlocked = true;
-                        }
-
-                    else Unlocked = true;
-
-                    // if visiting nodes updates state, and must be done on last itter means all needs fullfilled
-                    if (Temp_val.Setter_offset != Null && Unlocked)
+                    int j;
+                    for (j = Temp_val.Need_offset; j < Temp_val.Need_offset + Temp_val.Need_Len; j++)
                     {
-                        // changing state is only way to make new ndoes avialable
-                        Nodes_available = true;
+                        // if any need not complete it will break thats why next one is in condition
+                        if (States[State_helpers[j].Id] != State_helpers[j].Val)
+                            break;
 
-                        // set vals in array to be in the state
-                        for (int k = Temp_val.Setter_offset; k < Temp_val.Setter_offset + Temp_val.Setter_Len; k++)
-                        {
-                            // set in specific way
-                            var Helper_val = State_helpers[k];
-                            States[Helper_val.Id] = Helper_val.Op_type switch
-                            {
-                                Op_Type.Set => Helper_val.Val,
-                                Op_Type.Add => States[Helper_val.Id] + Helper_val.Val,
-                                Op_Type.Sub => States[Helper_val.Id] - Helper_val.Val,
-                                Op_Type.Divide => States[Helper_val.Id] / Helper_val.Val,
-                                Op_Type.Mul => States[Helper_val.Id] * Helper_val.Val,
-                                _ => Helper_val.Val
-                            };
-                        }
+                        // if visiting nodes updates state, and must be done on last itter means all needs fullfilled
+                        if (Temp_val.Setter_offset != Null && j == Temp_val.Need_offset + Temp_val.Need_Len - 1)
+                        Run_Node_Setter(ref Nodes_available, ref Temp_val); 
                     }
+
+                    // add to visited here so only adds when its req meet
+                    if (j == Temp_val.Need_offset + Temp_val.Need_Len)
+                        Nodes_visited.Add(i.Key);
                 }
 
                 for (int i = 0; i < Nodes_visited.Count; i++)
@@ -140,11 +123,40 @@ sealed class Dependency_Analyzer
         return Nodes[Target_node_id].Visited;
     }
 
+    private void Run_Node_Setter(ref bool Nodes_available, ref DA_Node Temp_val)
+    {
+        if (Temp_val.Setter_offset < 0 || Temp_val.Setter_Len < 1 || 
+        Temp_val.Setter_offset + Temp_val.Setter_Len > State_helpers.Length)
+        {
+            Temp_val.Setter_offset = Null;
+            return;
+        }
+
+        // changing state is only way to make new ndoes avialable
+        Nodes_available = true;
+
+        // set vals in array to be in the state
+        for (int i = Temp_val.Setter_offset; i < Temp_val.Setter_offset + Temp_val.Setter_Len; i++)
+        {
+            // set in specific way
+            var Helper_val = State_helpers[i];
+            States[Helper_val.Id] = Helper_val.Op_type switch
+            {
+                Op_Type.Set => Helper_val.Val,
+                Op_Type.Add => States[Helper_val.Id] + Helper_val.Val,
+                Op_Type.Sub => States[Helper_val.Id] - Helper_val.Val,
+                Op_Type.Divide => States[Helper_val.Id] / Helper_val.Val,
+                Op_Type.Mul => States[Helper_val.Id] * Helper_val.Val,
+                _ => Helper_val.Val
+            };
+        }
+
+    }
+
     // Enums -----------------------------
 
     public enum Op_Type : byte
     {
         Set, Add, Sub, Divide, Mul
     }
-
 }
