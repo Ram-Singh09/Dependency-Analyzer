@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>Dependency Analyzer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Dependency Analyzer home">
+        <span class="brand-mark">DA</span>
+        <span><strong>Dependency Analyzer</strong><small>State-driven reachability lab</small></span>
+      </a>
+      <div class="top-actions">
+        <span class="api-status"><i></i> API endpoint: <code>/Analyzer/Evaluate</code></span>
+        <button class="button button-quiet" id="loadExampleBtn" type="button">Load example</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <div class="eyebrow"><span class="eyebrow-line"></span> GRAPH EXECUTION WORKBENCH</div>
+          <h1>Build a scenario.<br><span>Test what’s reachable.</span></h1>
+          <p>Define integer states, configure node requirements and state changes, then watch the backend’s visitation sequence play out.</p>
+        </div>
+        <div class="hero-stat">
+          <span class="stat-label">SCENARIO SUMMARY</span>
+          <div class="stat-grid">
+            <div><strong id="stateCountStat">0</strong><span>States</span></div>
+            <div><strong id="nodeCountStat">0</strong><span>Nodes</span></div>
+            <div><strong id="ruleCountStat">0</strong><span>Rules</span></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="notice" id="semanticsNotice">
+        <span class="notice-icon">i</span>
+        <div><strong>Requirement behavior:</strong> your current C# analyzer checks required values using exact equality (current value <code>==</code> required value). The editor therefore uses “Required value”, not “minimum value”. If you want minimum thresholds, the backend comparison must change to <code>&gt;=</code>.</div>
+      </div>
+
+      <section class="workspace">
+        <aside class="sidebar panel">
+          <div class="panel-heading">
+            <div><span class="step-tag">01</span><h2>Initial states</h2></div>
+            <span class="subtle-count" id="stateCountLabel">0 defined</span>
+          </div>
+          <p class="panel-description">Create the integer variables your nodes can inspect or modify.</p>
+          <form id="stateForm" class="inline-form">
+            <label class="field grow">
+              <span>State name</span>
+              <input id="stateNameInput" type="text" maxlength="40" placeholder="e.g. KeyCount" autocomplete="off" required>
+            </label>
+            <label class="field value-field">
+              <span>Initial value</span>
+              <input id="stateValueInput" type="number" step="1" value="0" required>
+            </label>
+            <button class="button button-primary add-state-button" type="submit" aria-label="Add state">+</button>
+          </form>
+          <div id="statesList" class="states-list empty-state">
+            <div class="empty-icon">∑</div>
+            <strong>No states yet</strong>
+            <span>Add a state to start defining the scenario.</span>
+          </div>
+          <div class="panel-footnote"><span class="dot dot-blue"></span> State IDs are generated automatically and remain stable while editing.</div>
+        </aside>
+
+        <section class="main-column">
+          <div class="panel nodes-panel">
+            <div class="panel-heading">
+              <div><span class="step-tag">02</span><h2>Nodes</h2></div>
+              <button class="button button-primary" id="addNodeBtn" type="button"><span class="plus">+</span> Add node</button>
+            </div>
+            <p class="panel-description">Each node has optional requirements and optional state-changing actions. Node names are for display; the API receives integer IDs.</p>
+            <div id="nodesList" class="nodes-list empty-state">
+              <div class="empty-icon">◇</div>
+              <strong>No nodes yet</strong>
+              <span>Create your first node to configure its rules.</span>
+            </div>
+          </div>
+
+          <section class="panel target-panel">
+            <div class="panel-heading">
+              <div><span class="step-tag">03</span><h2>Choose target</h2></div>
+              <span class="target-hint">Required before analysis</span>
+            </div>
+            <div class="target-row">
+              <label class="field grow">
+                <span>Target node</span>
+                <select id="targetSelect" disabled><option value="">Create a node first</option></select>
+              </label>
+              <button class="button button-run" id="analyzeBtn" type="button"><span>▶</span> Analyze scenario</button>
+            </div>
+            <div id="validationBox" class="validation-box" hidden></div>
+          </section>
+        </section>
+      </section>
+
+      <section class="results-section" id="resultsSection" aria-live="polite">
+        <div class="results-header">
+          <div><div class="eyebrow"><span class="eyebrow-line"></span> EXECUTION TRACE</div><h2>Reachability result</h2></div>
+          <span id="resultBadge" class="result-badge neutral">Not run yet</span>
+        </div>
+        <div class="results-layout">
+          <div class="panel scene-panel">
+            <div class="scene-toolbar">
+              <div><strong>Node scene</strong><span>Backend visitation order</span></div>
+              <div class="legend"><span><i class="legend-gray"></i> Not visited</span><span><i class="legend-green"></i> Visited</span><span><i class="legend-red"></i> Target unreachable</span></div>
+            </div>
+            <div id="scene" class="scene empty-scene">
+              <div class="scene-empty-content"><span class="scene-symbol">◎</span><strong>Your scenario will appear here</strong><span>Configure nodes above, then run the analyzer.</span></div>
+            </div>
+            <div class="scene-footer"><span id="sequenceLabel">No execution sequence</span><button class="button button-quiet button-small" id="replayBtn" type="button" disabled>↻ Replay</button></div>
+          </div>
+          <aside class="panel result-side">
+            <div class="result-side-heading"><span class="result-icon">✓</span><div><strong id="resultTitle">Waiting for analysis</strong><span id="resultDescription">Run a scenario to see whether the target is reachable.</span></div></div>
+            <div class="result-metrics">
+              <div><span>Visited nodes</span><strong id="visitedCount">—</strong></div>
+              <div><span>Target node</span><strong id="targetNameResult">—</strong></div>
+            </div>
+            <h3>Visitation sequence</h3>
+            <ol id="sequenceList" class="sequence-list"><li class="sequence-empty">No nodes returned yet.</li></ol>
+            <details class="payload-details">
+              <summary>View request JSON</summary>
+              <pre id="requestJson">{ }</pre>
+              <button class="button button-quiet button-small" id="copyJsonBtn" type="button">Copy JSON</button>
+            </details>
+            <details class="payload-details">
+              <summary>View response JSON</summary>
+              <pre id="responseJson">{ }</pre>
+            </details>
+          </aside>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <span>DEPENDENCY ANALYZER <b>•</b> CLIENT-SIDE VALIDATION ENABLED</span>
+        <span>Served by ASP.NET Core · <code>wwwroot</code></span>
+      </footer>
+    </main>
+  </div>
+
+  <template id="stateRowTemplate">
+    <div class="state-row">
+      <div class="state-ident"><span class="state-id"></span><div><strong class="state-name"></strong><small>Integer state</small></div></div>
+      <label class="compact-field"><span>Initial value</span><input class="state-value" type="number" step="1"></label>
+      <button class="icon-button state-delete" type="button" title="Delete state" aria-label="Delete state">×</button>
+    </div>
+  </template>
+
+  <template id="nodeCardTemplate">
+    <article class="node-card">
+      <div class="node-card-header">
+        <div class="node-title-wrap"><span class="node-id-badge"></span><div><strong class="node-title"></strong><small class="node-summary"></small></div></div>
+        <div class="node-actions"><button class="icon-button node-rename" type="button" title="Rename node" aria-label="Rename node">✎</button><button class="icon-button node-delete" type="button" title="Delete node" aria-label="Delete node">×</button></div>
+      </div>
+      <div class="node-rule-columns">
+        <section class="rule-section requirements-section">
+          <div class="rule-heading"><div><span class="rule-icon requirement-icon">?</span><strong>Requirements</strong></div><button class="text-button add-requirement" type="button">+ Add</button></div>
+          <p class="rule-help">Every requirement must match.</p>
+          <div class="requirements-list"></div>
+        </section>
+        <section class="rule-section setters-section">
+          <div class="rule-heading"><div><span class="rule-icon setter-icon">↗</span><strong>State changes</strong></div><button class="text-button add-setter" type="button">+ Add</button></div>
+          <p class="rule-help">Applied when this node executes.</p>
+          <div class="setters-list"></div>
+        </section>
+      </div>
+      <div class="node-card-footer"><span class="node-footer-id"></span><span class="node-footer-count"></span></div>
+    </article>
+  </template>
+
+  <!-- Custom Modal Dialog -->
+  <div id="nodeModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <h3 id="modalTitle">Node Name</h3>
+      <p id="modalDesc">Enter a name for this node.</p>
+      <input id="modalInput" type="text" maxlength="40" placeholder="e.g. UnlockDoor" autocomplete="off">
+      <div class="modal-actions">
+        <button class="button button-quiet" id="modalCancel" type="button">Cancel</button>
+        <button class="button button-primary" id="modalConfirm" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
